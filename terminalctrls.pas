@@ -27,6 +27,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     procedure Restart;
+    procedure Command(const data: string);
   published
     property backgroundColor: TColor read fBackgroundColor write setBackgroundColor default clBlack;
     property foregroundColor: TColor read fForegroundColor write setForegroundColor default clWhite;
@@ -76,7 +77,7 @@ type
     property OnTerminate: TNotifyEvent read FOnTerminate write FOnTerminate;
   end;
 
-function TerminalAvaiable: Boolean;
+function TerminalAvailable: Boolean;
 
 implementation
 
@@ -115,8 +116,9 @@ var
   Info: PWidgetInfo;
   Style: PGtkRCStyle;
   Args: array[0..1] of PChar = ('/bin/bash', nil);
-  Flgs: array[boolean] of integer = (GTK_CAN_FOCUS, GTK_CAN_FOCUS or GTK_DOUBLE_BUFFERED);
   Allocation: TGTKAllocation;
+const
+  Flgs: array[boolean] of integer = (GTK_CAN_FOCUS, GTK_CAN_FOCUS or GTK_DOUBLE_BUFFERED);
 begin
   { Initialize widget info }
   Info := CreateWidgetInfo(gtk_frame_new(nil), AWinControl, AParams);
@@ -164,10 +166,13 @@ end;
 procedure TTerminal.Restart;
 var
   Info: PWidgetInfo;
-  Args: array[0..1] of PChar = ('/bin/bash', nil);
+  Args: array[0..1] of PChar = (nil, nil);
 begin
   if not HandleAllocated then
     Exit;
+  Args[0] := vte_get_user_shell();
+  if Args[0] = nil then
+    Args[0] := '/bin/bash';
   Info := PWidgetInfo(FInfo);
   gtk_widget_destroy(Info.ClientWidget);
   Info.ClientWidget := vte_terminal_new;
@@ -180,14 +185,22 @@ begin
   g_signal_connect(Info.ClientWidget, 'child-exited', G_CALLBACK(@TerminalExit), nil);
 end;
 
-function TerminalAvaiable: Boolean;
+procedure TTerminal.Command(const data: string);
+begin
+  {$ifdef lclgtk2}
+  if assigned(fTerminalHanlde) and assigned(vte_terminal_feed_child) then
+    vte_terminal_feed_child(fTerminalHanlde, PChar(data + #10), data.Length + 1);
+  {$endif}
+end;
+
+function TerminalAvailable: Boolean;
 begin
   Result := Gtk2TermLoad;
 end;
 
 function RegisterTerminal: Boolean;
 begin
-  Result := TerminalAvaiable;
+  Result := TerminalAvailable;
   if Result then
     RegisterWSComponent(TTerminal, TGtk2WSTerminal);
 end;
