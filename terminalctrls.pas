@@ -5,22 +5,32 @@ unit TerminalCtrls;
 interface
 
 uses
-  Classes, SysUtils, Controls, Graphics;
-
-{ TTerminal }
+  {$ifdef lclgtk2} Gtk2Term, {$endif} Classes, SysUtils, Controls, Graphics;
 
 type
+
   TTerminal = class(TCustomControl)
   private
-    FOnTerminate: TNotifyEvent;
     FInfo: Pointer;
+    fTerminalHanlde: PVteTerminal;
+    fOnTerminate: TNotifyEvent;
+    fBackgroundColor: TColor;
+    fForegroundColor: TColor;
+    fSelectedColor: TColor;
+    procedure setBackgroundColor(value: TColor);
+    procedure setForegroundColor(value: TColor);
+    procedure setSelectedColor(value: TColor);
   protected
     procedure Paint; override;
     procedure DoTerminate; virtual;
+    procedure FontChanged(Sender: TObject); override;
   public
     constructor Create(AOwner: TComponent); override;
     procedure Restart;
   published
+    property backgroundColor: TColor read fBackgroundColor write setBackgroundColor;
+    property foregroundColor: TColor read fForegroundColor write setForegroundColor;
+    property selectedColor: TColor read fSelectedColor write setSelectedColor;
     property Align;
     property Anchors;
     property Constraints;
@@ -28,7 +38,9 @@ type
     property DragCursor;
     property DragKind;
     property DragMode;
+    property DoubleBuffered;
     property Enabled;
+    property Font;
     property ParentShowHint;
     property PopupMenu;
     property ShowHint;
@@ -71,7 +83,7 @@ implementation
 {$ifdef lclgtk2}
 uses
   LCLType, WSControls, WSLCLClasses, GLib2, Gtk2, Gtk2Def, Gtk2Proc,
-  Gtk2WSControls, Gtk2Term;
+  Gtk2WSControls, gdk2;
 
 { TGtk2WSTerminal }
 
@@ -103,6 +115,7 @@ var
   Info: PWidgetInfo;
   Style: PGtkRCStyle;
   Args: array[0..1] of PChar = ('/bin/bash', nil);
+  Flgs: array[boolean] of integer = (GTK_CAN_FOCUS, GTK_CAN_FOCUS or GTK_DOUBLE_BUFFERED);
   Allocation: TGTKAllocation;
 begin
   { Initialize widget info }
@@ -122,11 +135,12 @@ begin
     Info.ClientWidget := CreateFixedClientWidget(True)
   else
   begin
-    Info.ClientWidget := vte_terminal_new;
+    Info.ClientWidget := vte_terminal_new();
+    TTerminal(AWinControl).fTerminalHanlde := VTE_TERMINAL(Info.ClientWidget);
     vte_terminal_fork_command_full(VTE_TERMINAL(Info.ClientWidget), VTE_PTY_DEFAULT,
       nil, @Args[0], nil, G_SPAWN_SEARCH_PATH, nil, nil, nil, nil);
   end;
-  GTK_WIDGET_SET_FLAGS(Info.CoreWidget, GTK_CAN_FOCUS);
+  GTK_WIDGET_SET_FLAGS(Info.CoreWidget, Flgs[AWinControl.DoubleBuffered]);
   gtk_container_add(GTK_CONTAINER(Info.CoreWidget), Info.ClientWidget);
   g_object_set_data(PGObject(Info.ClientWidget), 'widgetinfo', Info);
   gtk_widget_show_all(Info.CoreWidget);
@@ -156,7 +170,8 @@ begin
   Info := PWidgetInfo(FInfo);
   gtk_widget_destroy(Info.ClientWidget);
   Info.ClientWidget := vte_terminal_new;
-  vte_terminal_fork_command_full(VTE_TERMINAL(Info.ClientWidget), VTE_PTY_DEFAULT,
+  fTerminalHanlde := VTE_TERMINAL(Info.ClientWidget);
+  vte_terminal_fork_command_full(fTerminalHanlde, VTE_PTY_DEFAULT,
     nil, @Args[0], nil, G_SPAWN_SEARCH_PATH, nil, nil, nil, nil);
   gtk_container_add(GTK_CONTAINER(Info.CoreWidget), Info.ClientWidget);
   g_object_set_data(PGObject(Info.ClientWidget), 'widgetinfo', Info);
@@ -212,6 +227,65 @@ begin
   W := 0; H := 0;
   Canvas.GetTextSize(S, W, H);
   Canvas.TextOut((Width -  W) div 2, (Height -  H) div 2, S);
+end;
+
+procedure TTerminal.setBackgroundColor(value: TColor);
+var
+  c: TGDKColor;
+begin
+  fBackgroundColor:=value;
+  {$ifdef lclgtk2}
+  if assigned(fTerminalHanlde) and assigned(vte_terminal_set_color_background) then
+  begin
+    c := TColortoTGDKColor(fBackgroundColor);
+    vte_terminal_set_color_background(fTerminalHanlde, @c);
+  end;
+  {$endif}
+end;
+
+procedure TTerminal.setForegroundColor(value: TColor);
+var
+  c: TGDKColor;
+begin
+  fForegroundColor:=value;
+  {$ifdef lclgtk2}
+  if assigned(fTerminalHanlde) and assigned(vte_terminal_set_color_foreground) then
+  begin
+    c := TColortoTGDKColor(fForegroundColor);
+    vte_terminal_set_color_foreground(fTerminalHanlde, @c);
+  end;
+  {$endif}
+end;
+
+procedure TTerminal.setSelectedColor(value: TColor);
+var
+  c: TGDKColor;
+begin
+  fSelectedColor:=value;
+  {$ifdef lclgtk2}
+  if assigned(fTerminalHanlde) and assigned(vte_terminal_set_color_highlight)
+    and assigned(vte_terminal_set_color_highlight_foreground) then
+  begin
+    c := TColortoTGDKColor(fSelectedColor);
+    vte_terminal_set_color_highlight(fTerminalHanlde, @c);
+    c := TColortoTGDKColor(InvertColor(fSelectedColor));
+    vte_terminal_set_color_highlight_foreground(fTerminalHanlde, @c);
+  end;
+  {$endif}
+end;
+
+procedure TTerminal.FontChanged(Sender: TObject);
+begin
+  inherited;
+  {$ifdef lclgtk2}
+  {$push}{$Hints off}
+  if assigned(fTerminalHanlde) and assigned(vte_terminal_set_font) and
+    assigned(Handle) then
+  begin
+    vte_terminal_set_font(fTerminalHanlde, PGtkWidget(Handle).style.font_desc);
+  end;
+  {$pop}
+  {$endif}
 end;
 
 {$ifdef lclgtk2}
