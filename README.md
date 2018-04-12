@@ -1,2 +1,3 @@
-# Lazarus.Terminal
- Lazarus gnome terminal component and IDE plugin
+# Lazarus Terminal
+
+Lazarus gnome terminal component and IDE plugin.
