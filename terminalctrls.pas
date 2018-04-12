@@ -28,9 +28,9 @@ type
     constructor Create(AOwner: TComponent); override;
     procedure Restart;
   published
-    property backgroundColor: TColor read fBackgroundColor write setBackgroundColor;
-    property foregroundColor: TColor read fForegroundColor write setForegroundColor;
-    property selectedColor: TColor read fSelectedColor write setSelectedColor;
+    property backgroundColor: TColor read fBackgroundColor write setBackgroundColor default clBlack;
+    property foregroundColor: TColor read fForegroundColor write setForegroundColor default clWhite;
+    property selectedColor: TColor read fSelectedColor write setSelectedColor default clWhite;
     property Align;
     property Anchors;
     property Constraints;
@@ -154,6 +154,7 @@ begin
   Result := {%H-}TLCLIntfHandle(Info.CoreWidget);
 end;
 
+
 procedure TTerminal.DoTerminate;
 begin
   if Assigned(FOnTerminate) then
@@ -210,6 +211,11 @@ begin
   inherited Create(AOwner);
   Width := 300;
   Height := 200;
+  fBackgroundColor:= clBlack;
+  fForegroundColor:= clWhite;
+  fSelectedColor:= clWhite;
+  Font.Height:=11;
+  Font.Name:='Monospace';
 end;
 
 procedure TTerminal.Paint;
@@ -280,7 +286,7 @@ begin
   {$ifdef lclgtk2}
   {$push}{$Hints off}
   if assigned(fTerminalHanlde) and assigned(vte_terminal_set_font) and
-    assigned(Handle) then
+    (Handle <> INVALID_HANDLE_VALUE) then
   begin
     vte_terminal_set_font(fTerminalHanlde, PGtkWidget(Handle).style.font_desc);
   end;
