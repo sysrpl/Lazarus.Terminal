@@ -28,6 +28,7 @@ type
     FTerminal: ITerminal;
     FOnTerminate: TNotifyEvent;
   protected
+    procedure DoReady; virtual;
     procedure DoTerminate; virtual;
     property Terminal: ITerminal read FTerminal;
     property OnTerminate: TNotifyEvent read FOnTerminate write FOnTerminate;
@@ -47,6 +48,15 @@ uses
 function TerminalAvaiable: Boolean;
 begin
   Result := TerminalLoad;
+end;
+
+procedure TerminalReady(Widget: PGtkWidget); cdecl;
+var
+  Info: PWidgetInfo;
+begin
+  g_signal_handlers_disconnect_by_func(Widget, @TerminalReady, nil);
+  Info := PWidgetInfo(g_object_get_data(PGObject(Widget), 'widgetinfo'));
+  TTerminalControl(Info.LCLObject).DoReady;
 end;
 
 procedure TerminalExit(Widget: PGtkWidget); cdecl;
@@ -123,7 +133,9 @@ begin
     teBack: vte_terminal_set_color_background(VTE_TERMINAL(FInfo.ClientWidget), @C);
     teBold: vte_terminal_set_color_bold(VTE_TERMINAL(FInfo.ClientWidget), @C);
     teDim: vte_terminal_set_color_dim(VTE_TERMINAL(FInfo.ClientWidget), @C);
-    // teCursor: vte_terminal_set_color_cursor(VTE_TERMINAL(FInfo.ClientWidget), @C);
+    { For some reason setting the cursor color causes it to be removed entirely
+
+    teCursor: vte_terminal_set_color_cursor(VTE_TERMINAL(FInfo.ClientWidget), @C); }
     teHighlight: vte_terminal_set_color_highlight(VTE_TERMINAL(FInfo.ClientWidget), @C);
   end;
 end;
@@ -219,6 +231,7 @@ begin
   gtk_container_add(GTK_CONTAINER(FInfo.CoreWidget), FInfo.ClientWidget);
   g_object_set_data(PGObject(FInfo.ClientWidget), 'widgetinfo', FInfo);
   gtk_widget_show_all(FInfo.CoreWidget);
+  g_signal_connect(FInfo.ClientWidget, 'contents-changed', G_CALLBACK(@TerminalReady), nil);
   g_signal_connect(FInfo.ClientWidget, 'child-exited', G_CALLBACK(@TerminalExit), nil);
 end;
 
@@ -270,6 +283,8 @@ begin
   else
   begin
     Info.ClientWidget := vte_terminal_new;
+    g_signal_connect(Info.ClientWidget, 'contents-changed', G_CALLBACK(@TerminalReady), nil);
+    g_signal_connect(Info.ClientWidget, 'child-exited', G_CALLBACK(@TerminalExit), nil);
     vte_terminal_set_allow_bold(VTE_TERMINAL(Info.ClientWidget), True);
     vte_terminal_fork_command_full(VTE_TERMINAL(Info.ClientWidget), VTE_PTY_DEFAULT,
       nil, @Args[0], nil, G_SPAWN_SEARCH_PATH, nil, nil, nil, nil);
@@ -284,7 +299,6 @@ begin
   Allocation.Width := AParams.Width;
   Allocation.Height := AParams.Height;
   gtk_widget_size_allocate(Info.CoreWidget, @Allocation);
-  g_signal_connect(Info.ClientWidget, 'child-exited', G_CALLBACK(@TerminalExit), nil);
   SetCallbacks(Info.CoreWidget, Info);
   Result := {%H-}TLCLIntfHandle(Info.CoreWidget);
 end;
@@ -374,6 +388,10 @@ constructor TTerminalControl.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   FTerminal := TTerminal.Create(Self);
+end;
+
+procedure TTerminalControl.DoReady;
+begin
 end;
 
 procedure TTerminalControl.DoTerminate;

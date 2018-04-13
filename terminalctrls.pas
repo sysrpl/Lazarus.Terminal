@@ -5,7 +5,7 @@ unit TerminalCtrls;
 interface
 
 uses
-  Classes, SysUtils, Controls, Graphics, LCLType, LCLIntf, LMessages, VteIntf;
+  Classes, SysUtils, Controls, Graphics, LCLIntf, VteIntf;
 
 { TTerminalColors }
 
@@ -35,15 +35,13 @@ type
   TCustomTerminal = class(TTerminalControl)
   private
     FColors: TTerminalColors;
-    procedure WMTimer(var Message: TLMTimer); message LM_TIMER;
     procedure SetColors(Value: TTerminalColors);
   protected
-    procedure CreateHandle; override;
+    procedure DoReady; override;
     procedure ColorsChanged(Sender: TObject);
     procedure FontChanged(Sender: TObject); override;
     procedure Paint; override;
     property Colors: TTerminalColors read FColors write SetColors;
-    procedure Loaded; override;
   public
     constructor Create(AOwner: TComponent); override;
     procedure Restart;
@@ -172,9 +170,6 @@ end;
 
 { TCustomTerminal }
 
-const
-  HandleCreationTimer = $100;
-
 constructor TCustomTerminal.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
@@ -185,22 +180,8 @@ begin
   Font.Name := 'Monospace';
 end;
 
-procedure TCustomTerminal.WMTimer(var Message: TLMTimer);
+procedure TCustomTerminal.DoReady;
 begin
-  KillTimer(Handle, HandleCreationTimer);
-  FColors.Restart;
-  Terminal.SetFont(Font);
-end;
-
-procedure TCustomTerminal.CreateHandle;
-begin
-  inherited CreateHandle;
-  SetTimer(Handle, HandleCreationTimer, 1, nil);
-end;
-
-procedure TCustomTerminal.Loaded;
-begin
-  inherited Loaded;
   FColors.Restart;
   Terminal.SetFont(Font);
 end;
@@ -235,8 +216,6 @@ end;
 procedure TCustomTerminal.Restart;
 begin
   Terminal.Restart;
-  FColors.Restart;
-  Terminal.SetFont(Font);
 end;
 
 end.
