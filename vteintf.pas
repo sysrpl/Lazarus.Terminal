@@ -5,7 +5,7 @@ unit VteIntf;
 interface
 
 uses
-	Classes, SysUtils, Graphics, Controls;
+  Classes, SysUtils, Graphics, Controls;
 
 { ITerminal }
 
@@ -14,26 +14,26 @@ type
 
   ITerminal = interface
   ['{9A2FEC91-5C43-494C-B6FC-C47742E85316}']
-  	procedure SetInfo(Value: Pointer);
-		procedure SetColor(Element: TTerminalElement; Value: TColor);
+    procedure SetInfo(Value: Pointer);
+    procedure SetColor(Element: TTerminalElement; Value: TColor);
     procedure SetFont(Value: TFont);
-		procedure Paint;
+    procedure Paint;
     procedure Restart;
-	end;
+  end;
 
 { TTerminalControl }
 
   TTerminalControl = class(TCustomControl)
-	private
+  private
     FTerminal: ITerminal;
     FOnTerminate: TNotifyEvent;
-	protected
+  protected
     procedure DoTerminate; virtual;
-		property Terminal: ITerminal read FTerminal;
+    property Terminal: ITerminal read FTerminal;
     property OnTerminate: TNotifyEvent read FOnTerminate write FOnTerminate;
-	public
+  public
     constructor Create(AOwner: TComponent); override;
-	end;
+  end;
 
 function TerminalAvaiable: Boolean;
 
@@ -62,18 +62,18 @@ end;
 
 type
   TTerminal = class(TInterfacedObject, ITerminal)
-	private
+  private
     FControl: TTerminalControl;
     FInfo: PWidgetInfo;
-	protected
-  	procedure SetInfo(Value: Pointer);
-		procedure SetColor(Element: TTerminalElement; Value: TColor);
+  protected
+    procedure SetInfo(Value: Pointer);
+    procedure SetColor(Element: TTerminalElement; Value: TColor);
     procedure SetFont(Value: TFont);
-		procedure Paint;
+    procedure Paint;
     procedure Restart;
-	public
+  public
     constructor Create(Control: TTerminalControl);
-	end;
+  end;
 
 constructor TTerminal.Create(Control: TTerminalControl);
 begin
@@ -84,14 +84,14 @@ end;
 procedure TTerminal.SetInfo(Value: Pointer);
 begin
   if FInfo = nil then
-		FInfo := Value;
+    FInfo := Value;
 end;
 
 type
   TGdkColor = packed record
     pixel: LongWord;
     red, green, blue: Word;
-	end;
+  end;
 
 procedure ColorToGdk(C: TColor; out G: TGdkColor);
 begin
@@ -104,9 +104,9 @@ end;
 
 { How to set a Gtk object property:
 var
-	V: TGValue;
+  V: TGValue;
 begin
-	V.g_type := G_TYPE_DOUBLE;
+  V.g_type := G_TYPE_DOUBLE;
   V.data[0].v_double := 3;
   g_object_set_property(PGObject(Widget), 'scale', @V);
 end; }
@@ -115,16 +115,16 @@ procedure TTerminal.SetColor(Element: TTerminalElement; Value: TColor);
 var
   C: TGdkColor;
 begin
-	if FInfo = nil then
+  if FInfo = nil then
     Exit;
   ColorToGdk(Value, C);
   case Element of
-  	teFore: vte_terminal_set_color_foreground(VTE_TERMINAL(FInfo.ClientWidget), @C);
-  	teBack: vte_terminal_set_color_background(VTE_TERMINAL(FInfo.ClientWidget), @C);
-  	teBold: vte_terminal_set_color_bold(VTE_TERMINAL(FInfo.ClientWidget), @C);
-  	teDim: vte_terminal_set_color_dim(VTE_TERMINAL(FInfo.ClientWidget), @C);
-  	// teCursor: vte_terminal_set_color_cursor(VTE_TERMINAL(FInfo.ClientWidget), @C);
-  	teHighlight: vte_terminal_set_color_highlight(VTE_TERMINAL(FInfo.ClientWidget), @C);
+    teFore: vte_terminal_set_color_foreground(VTE_TERMINAL(FInfo.ClientWidget), @C);
+    teBack: vte_terminal_set_color_background(VTE_TERMINAL(FInfo.ClientWidget), @C);
+    teBold: vte_terminal_set_color_bold(VTE_TERMINAL(FInfo.ClientWidget), @C);
+    teDim: vte_terminal_set_color_dim(VTE_TERMINAL(FInfo.ClientWidget), @C);
+    // teCursor: vte_terminal_set_color_cursor(VTE_TERMINAL(FInfo.ClientWidget), @C);
+    teHighlight: vte_terminal_set_color_highlight(VTE_TERMINAL(FInfo.ClientWidget), @C);
   end;
 end;
 
@@ -142,46 +142,46 @@ var
   S, T: string;
   I: Integer;
 begin
-	if FInfo = nil then
+  if FInfo = nil then
     Exit;
   Name := LowerCase(Value.Name);
   Size := Value.Size;
   if (Name = 'default') or (Size < 1) then
-	begin
-  	g_object_get(gtk_settings_get_default, 'gtk-font-name', [@P, nil]);
+  begin
+    g_object_get(gtk_settings_get_default, 'gtk-font-name', [@P, nil]);
     S := P;
     if Name = 'default' then
     begin
-			I := Length(S);
+      I := Length(S);
       while S[I] in ['0'..'9'] do
-			begin
+      begin
         S[I] := ' ';
         Dec(I);
-			end;
+      end;
       Name := Trim(S);
-		end
+    end
     else
-    	Name := Value.Name;
+      Name := Value.Name;
     S := P;
     if Size = 0 then
     begin
-			I := Length(S);
+      I := Length(S);
       T := '';
       while S[I] in ['0'..'9'] do
-			begin
+      begin
         T := S[I] + T;
         Dec(I);
-			end;
+      end;
       Size := StrToInt(T);
-		end;
-		g_free(P);
-	end;
+    end;
+    g_free(P);
+  end;
   F := pango_font_description_new;
-	pango_font_description_set_family(F, PChar(Name));
+  pango_font_description_set_family(F, PChar(Name));
   pango_font_description_set_weight(F, Weights[fsBold in Value.Style]);
   pango_font_description_set_style(F, Styles[fsItalic in Value.Style]);
-	pango_font_description_set_size(F, Round(Size * PANGO_SCALE));
-	vte_terminal_set_font(VTE_TERMINAL(FInfo.ClientWidget), F);
+  pango_font_description_set_size(F, Round(Size * PANGO_SCALE));
+  vte_terminal_set_font(VTE_TERMINAL(FInfo.ClientWidget), F);
   pango_font_description_free(F);
 end;
 
@@ -224,7 +224,7 @@ end;
 
 function NewTerminal(Control: TTerminalControl): ITerminal;
 begin
-	Result := TTerminal.Create(Control);
+  Result := TTerminal.Create(Control);
 end;
 {$endregion}
 
@@ -306,17 +306,17 @@ end;
 
 type
   TTerminal = class(TInterfacedObject, ITerminal)
-	private
+  private
     FControl: TTerminalControl;
-	protected
-  	procedure SetInfo(Value: Pointer);
-		procedure SetColor(Element: TTerminalElement; Value: TColor);
+  protected
+    procedure SetInfo(Value: Pointer);
+    procedure SetColor(Element: TTerminalElement; Value: TColor);
     procedure SetFont(Value: TFont);
     procedure Paint;
     procedure Restart;
-	public
+  public
     constructor Create(Control: TTerminalControl);
-	end;
+  end;
 
 constructor TTerminal.Create(Control: TTerminalControl);
 begin
@@ -362,7 +362,7 @@ end;
 
 function NewTerminal(Control: TTerminalControl): ITerminal;
 begin
-	Result := TTerminal.Create(Control);
+  Result := TTerminal.Create(Control);
 end;
 
 procedure TerminalRegister;
@@ -379,7 +379,7 @@ end;
 procedure TTerminalControl.DoTerminate;
 begin
   if Assigned(FOnTerminate) then
-		FOnTerminate(Self);
+    FOnTerminate(Self);
 end;
 
 initialization

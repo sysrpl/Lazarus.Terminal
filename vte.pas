@@ -59,7 +59,7 @@ var
     working_directory: PChar; argv, envv: PPChar; spawn_flags: TGSpawnFlags;
     child_setup: TGSpawnChildSetupFunc; child_setup_data: Pointer; child_pid:
     PGPid; error: PGError): GBoolean; cdecl;
-	vte_terminal_set_allow_bold: procedure(terminal: PVteTerminal; allow_bold: GBoolean); cdecl;
+  vte_terminal_set_allow_bold: procedure(terminal: PVteTerminal; allow_bold: GBoolean); cdecl;
   vte_terminal_set_font: procedure(terminal: PVteTerminal; font_desc: PPangoFontDescription); cdecl;
   vte_terminal_set_color_foreground: procedure(terminal: PVteTerminal; foreground: PGdkColor); cdecl;
   vte_terminal_set_color_background: procedure(terminal: PVteTerminal; background: PGdkColor); cdecl;
@@ -84,9 +84,9 @@ var
 
   function Load(const ProcName : string; out Proc: Pointer): Boolean;
   begin
-		Proc := GetProcAddress(Lib, ProcName);
+    Proc := GetProcAddress(Lib, ProcName);
     Result := Proc <> nil;
-	end;
+  end;
 
 begin
   if Initialized then
@@ -96,16 +96,16 @@ begin
   if Lib = 0 then
     Exit(Loaded);
   Loaded :=
-  	Load('vte_terminal_new', @vte_terminal_new) and
-  	Load('vte_terminal_fork_command_full', @vte_terminal_fork_command_full) and
-  	Load('vte_terminal_set_allow_bold', @vte_terminal_set_allow_bold) and
-  	Load('vte_terminal_set_font', @vte_terminal_set_font) and
-		Load('vte_terminal_set_color_foreground', @vte_terminal_set_color_foreground) and
-		Load('vte_terminal_set_color_background', @vte_terminal_set_color_background) and
-		Load('vte_terminal_set_color_bold', @vte_terminal_set_color_bold) and
-		Load('vte_terminal_set_color_dim', @vte_terminal_set_color_dim) and
-		Load('vte_terminal_set_color_cursor', @vte_terminal_set_color_cursor) and
-		Load('vte_terminal_set_color_highlight', @vte_terminal_set_color_highlight);
+    Load('vte_terminal_new', @vte_terminal_new) and
+    Load('vte_terminal_fork_command_full', @vte_terminal_fork_command_full) and
+    Load('vte_terminal_set_allow_bold', @vte_terminal_set_allow_bold) and
+    Load('vte_terminal_set_font', @vte_terminal_set_font) and
+    Load('vte_terminal_set_color_foreground', @vte_terminal_set_color_foreground) and
+    Load('vte_terminal_set_color_background', @vte_terminal_set_color_background) and
+    Load('vte_terminal_set_color_bold', @vte_terminal_set_color_bold) and
+    Load('vte_terminal_set_color_dim', @vte_terminal_set_color_dim) and
+    Load('vte_terminal_set_color_cursor', @vte_terminal_set_color_cursor) and
+    Load('vte_terminal_set_color_highlight', @vte_terminal_set_color_highlight);
   Result := Loaded;
 end;
 

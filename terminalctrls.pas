@@ -10,31 +10,31 @@ uses
 { TTerminalColors }
 
 type
-	TTerminalColors = class(TPersistent)
-	private
+  TTerminalColors = class(TPersistent)
+  private
     FTerminal: ITerminal;
     FColors: array[TTerminalElement] of TColor;
     FChanged: TNotifyEvent;
     procedure SetColor(Index: Integer; Value: TColor);
     function GetColor(Index: Integer): TColor;
-	public
+  public
     constructor Create(Terminal: ITerminal; Changed: TNotifyEvent);
     procedure Assign(Source: TPersistent); override;
     procedure Restart;
-	published
-		property Foreground: TColor index 0 read GetColor write SetColor default clSilver;
-		property Background: TColor index 1 read GetColor write SetColor default clBlack;
-		property Bold: TColor index 2 read GetColor write SetColor default clWhite;
-		property Dim: TColor index 3 read GetColor write SetColor default clGray;
-		property Cursor: TColor index 4 read GetColor write SetColor default clWhite;
-		property Highlight: TColor index 5 read GetColor write SetColor default clWhite;
-	end;
+  published
+    property Foreground: TColor index 0 read GetColor write SetColor default clSilver;
+    property Background: TColor index 1 read GetColor write SetColor default clBlack;
+    property Bold: TColor index 2 read GetColor write SetColor default clWhite;
+    property Dim: TColor index 3 read GetColor write SetColor default clGray;
+    property Cursor: TColor index 4 read GetColor write SetColor default clWhite;
+    property Highlight: TColor index 5 read GetColor write SetColor default clWhite;
+  end;
 
 { TCustomTerminal }
 
   TCustomTerminal = class(TTerminalControl)
-	private
-		FColors: TTerminalColors;
+  private
+    FColors: TTerminalColors;
     procedure WMTimer(var Message: TLMTimer); message LM_TIMER;
     procedure SetColors(Value: TTerminalColors);
   protected
@@ -47,7 +47,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     procedure Restart;
-	end;
+  end;
 
 { TTerminal }
 
@@ -111,14 +111,14 @@ end;
 
 constructor TTerminalColors.Create(Terminal: ITerminal; Changed: TNotifyEvent);
 begin
-	inherited Create;
+  inherited Create;
   FTerminal := Terminal;
-	FColors[teFore] := clSilver;
-	FColors[teBack] := clBlack;
-	FColors[teBold] := clWhite;
-	FColors[teDim] := clGray;
-	FColors[teCursor] := clWhite;
-	FColors[teHighlight] := clWhite;
+  FColors[teFore] := clSilver;
+  FColors[teBack] := clBlack;
+  FColors[teBold] := clWhite;
+  FColors[teDim] := clGray;
+  FColors[teCursor] := clWhite;
+  FColors[teHighlight] := clWhite;
   FChanged := Changed;
 end;
 
@@ -128,45 +128,45 @@ var
   E: TTerminalElement;
 begin
   if Source = Self then
-  	Exit;
+    Exit;
   if Source is TTerminalColors then
-	begin
-		C := Source as TTerminalColors;
-		for E := Low(FColors) to High(FColors) do
-  		FColors[E] := C.FColors[E];
-		Restart;
+  begin
+    C := Source as TTerminalColors;
+    for E := Low(FColors) to High(FColors) do
+      FColors[E] := C.FColors[E];
+    Restart;
     FChanged(Self);
-	end
-	else
-  	inherited Assign(Source);
+  end
+  else
+    inherited Assign(Source);
 end;
 
 procedure TTerminalColors.Restart;
 var
   E: TTerminalElement;
 begin
-	for E := Low(FColors) to High(FColors) do
-  	FTerminal.SetColor(E, FColors[E]);
+  for E := Low(FColors) to High(FColors) do
+    FTerminal.SetColor(E, FColors[E]);
 end;
 
 procedure TTerminalColors.SetColor(Index: Integer; Value: TColor);
 var
   E: TTerminalElement;
 begin
-	E := TTerminalElement(Index);
+  E := TTerminalElement(Index);
   if Value <> FColors[E] then
   begin
     FColors[E] := Value;
-		FTerminal.SetColor(E, FColors[E]);
-  	FChanged(Self);
-	end;
+    FTerminal.SetColor(E, FColors[E]);
+    FChanged(Self);
+  end;
 end;
 
 function TTerminalColors.GetColor(Index: Integer): TColor;
 var
   E: TTerminalElement;
 begin
-	E := TTerminalElement(Index);
+  E := TTerminalElement(Index);
   Result := FColors[E];
 end;
 
@@ -195,7 +195,7 @@ end;
 procedure TCustomTerminal.CreateHandle;
 begin
   inherited CreateHandle;
-	SetTimer(Handle, HandleCreationTimer, 1, nil);
+  SetTimer(Handle, HandleCreationTimer, 1, nil);
 end;
 
 procedure TCustomTerminal.Loaded;
@@ -213,7 +213,7 @@ end;
 procedure TCustomTerminal.ColorsChanged(Sender: TObject);
 begin
   if csDesigning in ComponentState then
-  	Invalidate;
+    Invalidate;
 end;
 
 procedure TCustomTerminal.FontChanged(Sender: TObject);
@@ -221,7 +221,7 @@ begin
   inherited FontChanged(Sender);
   Terminal.SetFont(Font);
   if csDesigning in ComponentState then
-  	Invalidate;
+    Invalidate;
 end;
 
 procedure TCustomTerminal.Paint;
