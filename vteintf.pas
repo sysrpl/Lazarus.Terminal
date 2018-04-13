@@ -26,12 +26,10 @@ type
   TTerminalControl = class(TCustomControl)
   private
     FTerminal: ITerminal;
-    FOnTerminate: TNotifyEvent;
   protected
     procedure DoReady; virtual;
     procedure DoTerminate; virtual;
     property Terminal: ITerminal read FTerminal;
-    property OnTerminate: TNotifyEvent read FOnTerminate write FOnTerminate;
   public
     constructor Create(AOwner: TComponent); override;
   end;
@@ -396,8 +394,6 @@ end;
 
 procedure TTerminalControl.DoTerminate;
 begin
-  if Assigned(FOnTerminate) then
-    FOnTerminate(Self);
 end;
 
 initialization

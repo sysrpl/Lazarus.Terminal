@@ -35,13 +35,18 @@ type
   TCustomTerminal = class(TTerminalControl)
   private
     FColors: TTerminalColors;
+    FOnReady: TNotifyEvent;
+    FOnTerminate: TNotifyEvent;
     procedure SetColors(Value: TTerminalColors);
   protected
     procedure DoReady; override;
+    procedure DoTerminate; override;
     procedure ColorsChanged(Sender: TObject);
     procedure FontChanged(Sender: TObject); override;
     procedure Paint; override;
     property Colors: TTerminalColors read FColors write SetColors;
+    property OnReady: TNotifyEvent read FOnReady write FOnReady;
+    property OnTerminate: TNotifyEvent read FOnTerminate write FOnTerminate;
   public
     constructor Create(AOwner: TComponent); override;
     procedure Restart;
@@ -89,6 +94,7 @@ type
     property OnMouseWheel;
     property OnMouseWheelDown;
     property OnMouseWheelUp;
+    property OnReady;
     property OnResize;
     property OnStartDock;
     property OnStartDrag;
@@ -184,6 +190,14 @@ procedure TCustomTerminal.DoReady;
 begin
   FColors.Restart;
   Terminal.SetFont(Font);
+  if Assigned(FOnReady) then
+    FOnReady(Self);
+end;
+
+procedure TCustomTerminal.DoTerminate;
+begin
+  if Assigned(FOnTerminate) then
+    FOnTerminate(Self);
 end;
 
 procedure TCustomTerminal.SetColors(Value: TTerminalColors);
