@@ -138,61 +138,70 @@ begin
   end;
 end;
 
+{ This is the long way to create a pango font description:
+
+  const
+    Weights: array[Boolean] of TPangoWeight =
+      (PANGO_WEIGHT_NORMAL, PANGO_WEIGHT_BOLD);
+    Styles: array[Boolean] of TPangoStyle =
+      (PANGO_STYLE_NORMAL, PANGO_STYLE_ITALIC);
+  var
+    Name: string;
+    Size: Integer;
+    F: PPangoFontDescription;
+    P: PChar;
+    S, T: string;
+    I: Integer;
+  begin
+    Name := LowerCase(Value.Name);
+    Size := Value.Size;
+    if (Name = 'default') or (Size < 1) then
+    begin
+      g_object_get(gtk_settings_get_default, 'gtk-font-name', [@P, nil]);
+      S := P;
+      if Name = 'default' then
+      begin
+        I := Length(S);
+        while S[I] in ['0'..'9'] do
+        begin
+          S[I] := ' ';
+          Dec(I);
+        end;
+        Name := Trim(S);
+      end
+      else
+        Name := Value.Name;
+      S := P;
+      if Size = 0 then
+      begin
+        I := Length(S);
+        T := '';
+        while S[I] in ['0'..'9'] do
+        begin
+          T := S[I] + T;
+          Dec(I);
+        end;
+        Size := StrToInt(T);
+      end;
+      g_free(P);
+    end;
+    F := pango_font_description_new;
+    pango_font_description_set_family(F, PChar(Name));
+    pango_font_description_set_weight(F, Weights[fsBold in Value.Style]);
+    pango_font_description_set_style(F, Styles[fsItalic in Value.Style]);
+    pango_font_description_set_size(F, Round(Size * PANGO_SCALE));
+    ...
+    pango_font_description_free(F);
+  end; }
+
 procedure TTerminal.SetFont(Value: TFont);
-const
-  Weights: array[Boolean] of TPangoWeight =
-    (PANGO_WEIGHT_NORMAL, PANGO_WEIGHT_BOLD);
-  Styles: array[Boolean] of TPangoStyle =
-    (PANGO_STYLE_NORMAL, PANGO_STYLE_ITALIC);
 var
-  Name: string;
-  Size: Integer;
   F: PPangoFontDescription;
-  P: PChar;
-  S, T: string;
-  I: Integer;
 begin
   if FInfo = nil then
     Exit;
-  Name := LowerCase(Value.Name);
-  Size := Value.Size;
-  if (Name = 'default') or (Size < 1) then
-  begin
-    g_object_get(gtk_settings_get_default, 'gtk-font-name', [@P, nil]);
-    S := P;
-    if Name = 'default' then
-    begin
-      I := Length(S);
-      while S[I] in ['0'..'9'] do
-      begin
-        S[I] := ' ';
-        Dec(I);
-      end;
-      Name := Trim(S);
-    end
-    else
-      Name := Value.Name;
-    S := P;
-    if Size = 0 then
-    begin
-      I := Length(S);
-      T := '';
-      while S[I] in ['0'..'9'] do
-      begin
-        T := S[I] + T;
-        Dec(I);
-      end;
-      Size := StrToInt(T);
-    end;
-    g_free(P);
-  end;
-  F := pango_font_description_new;
-  pango_font_description_set_family(F, PChar(Name));
-  pango_font_description_set_weight(F, Weights[fsBold in Value.Style]);
-  pango_font_description_set_style(F, Styles[fsItalic in Value.Style]);
-  pango_font_description_set_size(F, Round(Size * PANGO_SCALE));
+  F :=  pango_layout_get_font_description({%H-}PGDIObject(Value.Handle).GDIFontObject);
   vte_terminal_set_font(VTE_TERMINAL(FInfo.ClientWidget), F);
-  pango_font_description_free(F);
 end;
 
 procedure TTerminal.Paint;
