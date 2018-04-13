@@ -6,18 +6,22 @@
     <CompilerOptions>
       <Version Value="11"/>
       <SearchPaths>
-        <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)/"/>
+        <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
     </CompilerOptions>
-    <Files Count="2">
+    <Files Count="3">
       <Item1>
-        <Filename Value="gtk2term.pas"/>
-        <UnitName Value="Gtk2Term"/>
-      </Item1>
-      <Item2>
         <Filename Value="terminalctrls.pas"/>
         <UnitName Value="TerminalCtrls"/>
+      </Item1>
+      <Item2>
+        <Filename Value="vte.pas"/>
+        <UnitName Value="Vte"/>
       </Item2>
+      <Item3>
+        <Filename Value="vteintf.pas"/>
+        <UnitName Value="vteintf"/>
+      </Item3>
     </Files>
     <RequiredPkgs Count="1">
       <Item1>

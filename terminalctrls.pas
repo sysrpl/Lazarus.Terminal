@@ -5,30 +5,64 @@ unit TerminalCtrls;
 interface
 
 uses
-  Classes, SysUtils, Controls, Graphics;
+  Classes, SysUtils, Controls, Graphics, LCLType, LCLIntf, LMessages, VteIntf;
 
-{ TTerminal }
+{ TTerminalColors }
 
 type
-  TTerminal = class(TCustomControl)
-  private
-    FOnTerminate: TNotifyEvent;
-    FInfo: Pointer;
+	TTerminalColors = class(TPersistent)
+	private
+    FTerminal: ITerminal;
+    FColors: array[TTerminalElement] of TColor;
+    FChanged: TNotifyEvent;
+    procedure SetColor(Index: Integer; Value: TColor);
+    function GetColor(Index: Integer): TColor;
+	public
+    constructor Create(Terminal: ITerminal; Changed: TNotifyEvent);
+    procedure Assign(Source: TPersistent); override;
+    procedure Restart;
+	published
+		property Foreground: TColor index 0 read GetColor write SetColor default clSilver;
+		property Background: TColor index 1 read GetColor write SetColor default clBlack;
+		property Bold: TColor index 2 read GetColor write SetColor default clWhite;
+		property Dim: TColor index 3 read GetColor write SetColor default clGray;
+		property Cursor: TColor index 4 read GetColor write SetColor default clWhite;
+		property Highlight: TColor index 5 read GetColor write SetColor default clWhite;
+	end;
+
+{ TCustomTerminal }
+
+  TCustomTerminal = class(TTerminalControl)
+	private
+		FColors: TTerminalColors;
+    procedure WMTimer(var Message: TLMTimer); message LM_TIMER;
+    procedure SetColors(Value: TTerminalColors);
   protected
+    procedure CreateHandle; override;
+    procedure ColorsChanged(Sender: TObject);
+    procedure FontChanged(Sender: TObject); override;
     procedure Paint; override;
-    procedure DoTerminate; virtual;
+    property Colors: TTerminalColors read FColors write SetColors;
+    procedure Loaded; override;
   public
     constructor Create(AOwner: TComponent); override;
     procedure Restart;
+	end;
+
+{ TTerminal }
+
+  TTerminal = class(TCustomTerminal)
   published
     property Align;
     property Anchors;
+    property Colors;
     property Constraints;
     property DockSite;
     property DragCursor;
     property DragKind;
     property DragMode;
     property Enabled;
+    property Font;
     property ParentShowHint;
     property PopupMenu;
     property ShowHint;
@@ -61,162 +95,149 @@ type
     property OnStartDock;
     property OnStartDrag;
     property OnUnDock;
-    property OnTerminate: TNotifyEvent read FOnTerminate write FOnTerminate;
+    property OnTerminate;
   end;
 
 function TerminalAvaiable: Boolean;
 
 implementation
 
-{$ifdef lclgtk2}
-uses
-  LCLType, WSControls, WSLCLClasses, GLib2, Gtk2, Gtk2Def, Gtk2Proc,
-  Gtk2WSControls, Gtk2Term;
-
-{ TGtk2WSTerminal }
-
-type
-  TGtk2WSTerminal = class(TWSCustomControl)
-  protected
-    class procedure SetCallbacks(const AGtkWidget: PGtkWidget; const AWidgetInfo: PWidgetInfo); virtual;
-  published
-    class function CreateHandle(const AWinControl: TWinControl; const AParams: TCreateParams): TLCLIntfHandle; override;
-  end;
-
-procedure TerminalExit(Widget: PGtkWidget); cdecl;
-var
-  Info: PWidgetInfo;
+function TerminalAvaiable: Boolean;
 begin
-  Info := PWidgetInfo(g_object_get_data(PGObject(Widget), 'widgetinfo'));
-  TTerminal(Info.LCLObject).DoTerminate;
+  Result := VteIntf.TerminalAvaiable;
 end;
 
-class procedure TGtk2WSTerminal.SetCallbacks(const AGtkWidget: PGtkWidget;
-  const AWidgetInfo: PWidgetInfo);
+{ TTerminalColors }
+
+constructor TTerminalColors.Create(Terminal: ITerminal; Changed: TNotifyEvent);
 begin
-  TGtk2WSWinControl.SetCallbacks(PGtkObject(AGtkWidget), TComponent(AWidgetInfo^.LCLObject));
+	inherited Create;
+  FTerminal := Terminal;
+	FColors[teFore] := clSilver;
+	FColors[teBack] := clBlack;
+	FColors[teBold] := clWhite;
+	FColors[teDim] := clGray;
+	FColors[teCursor] := clWhite;
+	FColors[teHighlight] := clWhite;
+  FChanged := Changed;
 end;
 
-class function TGtk2WSTerminal.CreateHandle(const AWinControl: TWinControl;
-  const AParams: TCreateParams): TLCLIntfHandle;
+procedure TTerminalColors.Assign(Source: TPersistent);
 var
-  Info: PWidgetInfo;
-  Style: PGtkRCStyle;
-  Args: array[0..1] of PChar = ('/bin/bash', nil);
-  Allocation: TGTKAllocation;
+  C: TTerminalColors;
+  E: TTerminalElement;
 begin
-  { Initialize widget info }
-  Info := CreateWidgetInfo(gtk_frame_new(nil), AWinControl, AParams);
-  Info.LCLObject := AWinControl;
-  Info.Style := AParams.Style;
-  Info.ExStyle := AParams.ExStyle;
-  Info.WndProc := {%H-}PtrUInt(AParams.WindowClass.lpfnWndProc);
-  TTerminal(AWinControl).FInfo := Info;
-  { Configure core and client }
-  gtk_frame_set_shadow_type(PGtkFrame(Info.CoreWidget), GTK_SHADOW_NONE);
-  Style := gtk_widget_get_modifier_style(Info.CoreWidget);
-  Style.xthickness := 0;
-  Style.ythickness := 0;
-  gtk_widget_modify_style(Info.CoreWidget, Style);
-  if csDesigning in AWinControl.ComponentState then
-    Info.ClientWidget := CreateFixedClientWidget(True)
-  else
+  if Source = Self then
+  	Exit;
+  if Source is TTerminalColors then
+	begin
+		C := Source as TTerminalColors;
+		for E := Low(FColors) to High(FColors) do
+  		FColors[E] := C.FColors[E];
+		Restart;
+    FChanged(Self);
+	end
+	else
+  	inherited Assign(Source);
+end;
+
+procedure TTerminalColors.Restart;
+var
+  E: TTerminalElement;
+begin
+	for E := Low(FColors) to High(FColors) do
+  	FTerminal.SetColor(E, FColors[E]);
+end;
+
+procedure TTerminalColors.SetColor(Index: Integer; Value: TColor);
+var
+  E: TTerminalElement;
+begin
+	E := TTerminalElement(Index);
+  if Value <> FColors[E] then
   begin
-    Info.ClientWidget := vte_terminal_new;
-    vte_terminal_fork_command_full(VTE_TERMINAL(Info.ClientWidget), VTE_PTY_DEFAULT,
-      nil, @Args[0], nil, G_SPAWN_SEARCH_PATH, nil, nil, nil, nil);
-  end;
-  GTK_WIDGET_SET_FLAGS(Info.CoreWidget, GTK_CAN_FOCUS);
-  gtk_container_add(GTK_CONTAINER(Info.CoreWidget), Info.ClientWidget);
-  g_object_set_data(PGObject(Info.ClientWidget), 'widgetinfo', Info);
-  gtk_widget_show_all(Info.CoreWidget);
-  Allocation.X := AParams.X;
-  Allocation.Y := AParams.Y;
-  Allocation.Width := AParams.Width;
-  Allocation.Height := AParams.Height;
-  gtk_widget_size_allocate(Info.CoreWidget, @Allocation);
-  g_signal_connect(Info.ClientWidget, 'child-exited', G_CALLBACK(@TerminalExit), nil);
-  SetCallbacks(Info.CoreWidget, Info);
-  Result := {%H-}TLCLIntfHandle(Info.CoreWidget);
+    FColors[E] := Value;
+		FTerminal.SetColor(E, FColors[E]);
+  	FChanged(Self);
+	end;
 end;
 
-procedure TTerminal.DoTerminate;
-begin
-  if Assigned(FOnTerminate) then
-    FOnTerminate(Self);
-end;
-
-procedure TTerminal.Restart;
+function TTerminalColors.GetColor(Index: Integer): TColor;
 var
-  Info: PWidgetInfo;
-  Args: array[0..1] of PChar = ('/bin/bash', nil);
+  E: TTerminalElement;
 begin
-  if not HandleAllocated then
-    Exit;
-  Info := PWidgetInfo(FInfo);
-  gtk_widget_destroy(Info.ClientWidget);
-  Info.ClientWidget := vte_terminal_new;
-  vte_terminal_fork_command_full(VTE_TERMINAL(Info.ClientWidget), VTE_PTY_DEFAULT,
-    nil, @Args[0], nil, G_SPAWN_SEARCH_PATH, nil, nil, nil, nil);
-  gtk_container_add(GTK_CONTAINER(Info.CoreWidget), Info.ClientWidget);
-  g_object_set_data(PGObject(Info.ClientWidget), 'widgetinfo', Info);
-  gtk_widget_show_all(Info.CoreWidget);
-  g_signal_connect(Info.ClientWidget, 'child-exited', G_CALLBACK(@TerminalExit), nil);
+	E := TTerminalElement(Index);
+  Result := FColors[E];
 end;
 
-function TerminalAvaiable: Boolean;
-begin
-  Result := Gtk2TermLoad;
-end;
+{ TCustomTerminal }
 
-function RegisterTerminal: Boolean;
-begin
-  Result := TerminalAvaiable;
-  if Result then
-    RegisterWSComponent(TTerminal, TGtk2WSTerminal);
-end;
-{$else}
-function TerminalAvaiable: Boolean;
-begin
-  Result := False;
-end;
+const
+  HandleCreationTimer = $100;
 
-procedure TTerminal.DoTerminate;
-begin
-end;
-
-procedure TTerminal.Restart;
-begin
-end;
-{$endif}
-
-constructor TTerminal.Create(AOwner: TComponent);
+constructor TCustomTerminal.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  FColors := TTerminalColors.Create(Terminal, ColorsChanged);
   Width := 300;
   Height := 200;
+  ParentFont := False;
+  Font.Name := 'Monospace';
 end;
 
-procedure TTerminal.Paint;
-const
-  S = 'linux@user:~$ bash terminal';
-var
-  W, H: Integer;
+procedure TCustomTerminal.WMTimer(var Message: TLMTimer);
 begin
-  Canvas.Pen.Style := psDash;
-  Canvas.Pen.Color := clWhite;
-  Canvas.Brush.Color := clBlack;
-  Canvas.Font.Color := clWhite;
-  Canvas.FillRect(ClientRect);
-  Canvas.Rectangle(ClientRect);
-  W := 0; H := 0;
-  Canvas.GetTextSize(S, W, H);
-  Canvas.TextOut((Width -  W) div 2, (Height -  H) div 2, S);
+  KillTimer(Handle, HandleCreationTimer);
+  FColors.Restart;
+  Terminal.SetFont(Font);
 end;
 
-{$ifdef lclgtk2}
-initialization
-  RegisterTerminal;
-{$endif}
+procedure TCustomTerminal.CreateHandle;
+begin
+  inherited CreateHandle;
+	SetTimer(Handle, HandleCreationTimer, 1, nil);
+end;
+
+procedure TCustomTerminal.Loaded;
+begin
+  inherited Loaded;
+  FColors.Restart;
+  Terminal.SetFont(Font);
+end;
+
+procedure TCustomTerminal.SetColors(Value: TTerminalColors);
+begin
+  FColors.Assign(Value);
+end;
+
+procedure TCustomTerminal.ColorsChanged(Sender: TObject);
+begin
+  if csDesigning in ComponentState then
+  	Invalidate;
+end;
+
+procedure TCustomTerminal.FontChanged(Sender: TObject);
+begin
+  inherited FontChanged(Sender);
+  Terminal.SetFont(Font);
+  if csDesigning in ComponentState then
+  	Invalidate;
+end;
+
+procedure TCustomTerminal.Paint;
+begin
+  Canvas.Brush.Color := FColors.Background;
+  Canvas.Pen.Color := FColors.Foreground;
+  Canvas.Font.Assign(Font);
+  Terminal.Paint;
+end;
+
+procedure TCustomTerminal.Restart;
+begin
+  Terminal.Restart;
+  FColors.Restart;
+  Terminal.SetFont(Font);
+end;
+
 end.
 

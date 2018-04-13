@@ -8,7 +8,7 @@ unit terminal;
 interface
 
 uses
-  Gtk2Term, TerminalCtrls, LazarusPackageIntf;
+  TerminalCtrls, Vte, VteIntf, LazarusPackageIntf;
 
 implementation
 
