@@ -6,7 +6,7 @@ interface
 
 {$ifdef lclgtk2}
 uses
-  GLib2, Gtk2;
+  GLib2, Gtk2, dynlibs, gdk2, pango;
 
 type
   GPid = LongWord;
@@ -51,10 +51,33 @@ type
 
 var
   vte_terminal_new: function: PGtkWidget; cdecl;
+
   vte_terminal_fork_command_full: function(terminal: PVteTerminal; pty_flags: TVtePtyFlags;
     working_directory: PChar; argv, envv: PPChar; spawn_flags: TGSpawnFlags;
     child_setup: TGSpawnChildSetupFunc; child_setup_data: Pointer; child_pid:
     PGPid; error: PGError): GBoolean; cdecl;
+
+  vte_terminal_set_color_background: procedure(terminal: PVteTerminal;
+    const background: PGdkColor); cdecl;
+
+  vte_terminal_set_color_foreground: procedure(terminal: PVteTerminal;
+    const background: PGdkColor); cdecl;
+
+  vte_terminal_set_color_highlight: procedure(terminal: PVteTerminal;
+    const background: PGdkColor); cdecl;
+
+  vte_terminal_set_color_highlight_foreground: procedure(terminal: PVteTerminal;
+    const background: PGdkColor); cdecl;
+
+  vte_terminal_set_font: procedure(terminal: PVteTerminal;
+    const font_desc: PPangoFontDescription); cdecl;
+
+  vte_terminal_feed: procedure(terminal: PVteTerminal; data: PChar;
+    length: PtrInt); cdecl;
+
+  vte_terminal_feed_child: procedure(terminal: PVteTerminal; data: PChar; length: PtrInt); cdecl;
+
+  vte_get_user_shell: function(): PChar;
 
 function Gtk2TermLoad: Boolean;
 
@@ -76,11 +99,21 @@ begin
   Lib := LoadLibrary(vte);
   if Lib = 0 then
     Exit(Loaded);
+
   @vte_terminal_new := GetProcAddress(Lib, 'vte_terminal_new');
   @vte_terminal_fork_command_full := GetProcAddress(Lib, 'vte_terminal_fork_command_full');
-  Loaded :=
-    (@vte_terminal_new <> nil) and
-    (@vte_terminal_fork_command_full <> nil);
+  @vte_terminal_set_color_background := GetProcAddress(Lib, 'vte_terminal_set_color_background');
+  @vte_terminal_set_color_foreground := GetProcAddress(Lib, 'vte_terminal_set_color_foreground');
+  @vte_terminal_set_color_highlight := GetProcAddress(Lib, 'vte_terminal_set_color_highlight');
+  @vte_terminal_set_color_highlight_foreground := GetProcAddress(Lib, 'vte_terminal_set_color_highlight_foreground');
+  @vte_terminal_set_font := GetProcAddress(Lib, 'vte_terminal_set_font');
+  @vte_terminal_feed := GetProcAddress(Lib, 'vte_terminal_feed');
+  @vte_terminal_feed_child := GetProcAddress(Lib, 'vte_terminal_feed_child');
+  @vte_get_user_shell := GetProcAddress(Lib, 'vte_get_user_shell');
+
+  // assume all or none
+  Loaded := @vte_terminal_new <> nil;
+
   Result := Loaded;
 end;
 {$else}
