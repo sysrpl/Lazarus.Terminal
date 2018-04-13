@@ -2,10 +2,16 @@ unit TerminalCtrls;
 
 {$mode delphi}
 
+{$ifdef lclgtk2}
+  {$ifdef unix}
+    {$define hasgtk2term}
+  {$endif}
+{$endif}
+
 interface
 
 uses
-  {$ifdef lclgtk2} Gtk2Term, {$endif} Classes, SysUtils, Controls, Graphics;
+  Gtk2Term, Classes, SysUtils, Controls, Graphics;
 
 type
 
@@ -14,6 +20,7 @@ type
     FInfo: Pointer;
     fTerminalHanlde: PVteTerminal;
     fOnTerminate: TNotifyEvent;
+    fOnTerminalVisibleChanged: TNotifyEvent;
     fBackgroundColor: TColor;
     fForegroundColor: TColor;
     fSelectedColor: TColor;
@@ -21,16 +28,22 @@ type
     procedure setForegroundColor(value: TColor);
     procedure setSelectedColor(value: TColor);
   protected
+    // Only used at design-time.
     procedure Paint; override;
     procedure DoTerminate; virtual;
+    procedure DoTerminalVisibleChanged; virtual;
     procedure FontChanged(Sender: TObject); override;
   public
     constructor Create(AOwner: TComponent); override;
     procedure Restart;
+    // Sends a command, as it would be manually typed. Line feed is automatically added.
     procedure Command(const data: string);
   published
+    // Background color
     property backgroundColor: TColor read fBackgroundColor write setBackgroundColor default clBlack;
+    // Font color
     property foregroundColor: TColor read fForegroundColor write setForegroundColor default clWhite;
+    // Background color for the selection
     property selectedColor: TColor read fSelectedColor write setSelectedColor default clWhite;
     property Align;
     property Anchors;
@@ -41,6 +54,7 @@ type
     property DragMode;
     property DoubleBuffered;
     property Enabled;
+    // The name and height properties are handled. see foregroundColor for Color.
     property Font;
     property ParentShowHint;
     property PopupMenu;
@@ -75,25 +89,29 @@ type
     property OnStartDrag;
     property OnUnDock;
     property OnTerminate: TNotifyEvent read FOnTerminate write FOnTerminate;
+    // Note: The hosted widget is there and visual settings can be applied.
+    // In many cases DoFirstShow, OnShow and likes will happen too quickly.
+    property OnTerminalVisibleChanged: TNotifyEvent read fOnTerminalVisibleChanged write fOnTerminalVisibleChanged;
   end;
 
 function TerminalAvailable: Boolean;
 
 implementation
 
-{$ifdef lclgtk2}
+{$ifdef hasgtk2term}
 uses
   LCLType, WSControls, WSLCLClasses, GLib2, Gtk2, Gtk2Def, Gtk2Proc,
   Gtk2WSControls, gdk2;
 
-{ TGtk2WSTerminal }
-
 type
+
   TGtk2WSTerminal = class(TWSCustomControl)
   protected
-    class procedure SetCallbacks(const AGtkWidget: PGtkWidget; const AWidgetInfo: PWidgetInfo); virtual;
+    class procedure SetCallbacks(const AGtkWidget: PGtkWidget;
+      const AWidgetInfo: PWidgetInfo); virtual;
   published
-    class function CreateHandle(const AWinControl: TWinControl; const AParams: TCreateParams): TLCLIntfHandle; override;
+    class function CreateHandle(const AWinControl: TWinControl;
+        const AParams: TCreateParams): TLCLIntfHandle; override;
   end;
 
 procedure TerminalExit(Widget: PGtkWidget); cdecl;
@@ -102,6 +120,14 @@ var
 begin
   Info := PWidgetInfo(g_object_get_data(PGObject(Widget), 'widgetinfo'));
   TTerminal(Info.LCLObject).DoTerminate;
+end;
+
+procedure TerminalRefresh(Widget: PGtkWidget); cdecl;
+var
+  Info: PWidgetInfo;
+begin
+  Info := PWidgetInfo(g_object_get_data(PGObject(Widget), 'widgetinfo'));
+  TTerminal(Info.LCLObject).DoTerminalVisibleChanged;
 end;
 
 class procedure TGtk2WSTerminal.SetCallbacks(const AGtkWidget: PGtkWidget;
@@ -115,11 +141,15 @@ class function TGtk2WSTerminal.CreateHandle(const AWinControl: TWinControl;
 var
   Info: PWidgetInfo;
   Style: PGtkRCStyle;
-  Args: array[0..1] of PChar = ('/bin/bash', nil);
+  Args: array[0..1] of PChar = (nil, nil);
   Allocation: TGTKAllocation;
 const
   Flgs: array[boolean] of integer = (GTK_CAN_FOCUS, GTK_CAN_FOCUS or GTK_DOUBLE_BUFFERED);
 begin
+  Args[0] := vte_get_user_shell();
+  if Args[0] = nil then
+    Args[0] := '/bin/bash';
+
   { Initialize widget info }
   Info := CreateWidgetInfo(gtk_frame_new(nil), AWinControl, AParams);
   Info.LCLObject := AWinControl;
@@ -127,6 +157,7 @@ begin
   Info.ExStyle := AParams.ExStyle;
   Info.WndProc := {%H-}PtrUInt(AParams.WindowClass.lpfnWndProc);
   TTerminal(AWinControl).FInfo := Info;
+
   { Configure core and client }
   gtk_frame_set_shadow_type(PGtkFrame(Info.CoreWidget), GTK_SHADOW_NONE);
   Style := gtk_widget_get_modifier_style(Info.CoreWidget);
@@ -152,10 +183,11 @@ begin
   Allocation.Height := AParams.Height;
   gtk_widget_size_allocate(Info.CoreWidget, @Allocation);
   g_signal_connect(Info.ClientWidget, 'child-exited', G_CALLBACK(@TerminalExit), nil);
+  g_signal_connect(Info.ClientWidget, 'contents-changed', G_CALLBACK(@TerminalRefresh), nil);
   SetCallbacks(Info.CoreWidget, Info);
   Result := {%H-}TLCLIntfHandle(Info.CoreWidget);
 end;
-
+{$endif}
 
 procedure TTerminal.DoTerminate;
 begin
@@ -163,13 +195,23 @@ begin
     FOnTerminate(Self);
 end;
 
+procedure TTerminal.DoTerminalVisibleChanged;
+begin
+  if Assigned(fOnTerminalVisibleChanged) then
+    fOnTerminalVisibleChanged(Self);
+end;
+
 procedure TTerminal.Restart;
+{$ifdef hasgtk2term}
 var
   Info: PWidgetInfo;
   Args: array[0..1] of PChar = (nil, nil);
+{$endif}
 begin
+  {$ifdef hasgtk2term}
   if not HandleAllocated then
     Exit;
+
   Args[0] := vte_get_user_shell();
   if Args[0] = nil then
     Args[0] := '/bin/bash';
@@ -183,11 +225,13 @@ begin
   g_object_set_data(PGObject(Info.ClientWidget), 'widgetinfo', Info);
   gtk_widget_show_all(Info.CoreWidget);
   g_signal_connect(Info.ClientWidget, 'child-exited', G_CALLBACK(@TerminalExit), nil);
+  g_signal_connect(Info.ClientWidget, 'contents-changed', G_CALLBACK(@TerminalRefresh), nil);
+  {$endif}
 end;
 
 procedure TTerminal.Command(const data: string);
 begin
-  {$ifdef lclgtk2}
+  {$ifdef hasgtk2term}
   if assigned(fTerminalHanlde) and assigned(vte_terminal_feed_child) then
     vte_terminal_feed_child(fTerminalHanlde, PChar(data + #10), data.Length + 1);
   {$endif}
@@ -195,7 +239,11 @@ end;
 
 function TerminalAvailable: Boolean;
 begin
+  {$ifdef hasgtk2term}
   Result := Gtk2TermLoad;
+  {$else}
+  Result := false;
+  {$endif}
 end;
 
 function RegisterTerminal: Boolean;
@@ -204,20 +252,6 @@ begin
   if Result then
     RegisterWSComponent(TTerminal, TGtk2WSTerminal);
 end;
-{$else}
-function TerminalAvaiable: Boolean;
-begin
-  Result := False;
-end;
-
-procedure TTerminal.DoTerminate;
-begin
-end;
-
-procedure TTerminal.Restart;
-begin
-end;
-{$endif}
 
 constructor TTerminal.Create(AOwner: TComponent);
 begin
@@ -233,19 +267,22 @@ end;
 
 procedure TTerminal.Paint;
 const
-  S = 'linux@user:~$ bash terminal';
+  s = 'linux@user:~$ bash terminal';
 var
-  W, H: Integer;
+  w: integer = 0;
+  h: integer = 0;
 begin
+  if not (csDesigning in ComponentState) then
+    exit;
+
   Canvas.Pen.Style := psDash;
   Canvas.Pen.Color := clWhite;
   Canvas.Brush.Color := clBlack;
   Canvas.Font.Color := clWhite;
   Canvas.FillRect(ClientRect);
   Canvas.Rectangle(ClientRect);
-  W := 0; H := 0;
-  Canvas.GetTextSize(S, W, H);
-  Canvas.TextOut((Width -  W) div 2, (Height -  H) div 2, S);
+  Canvas.GetTextSize(s, w, h);
+  Canvas.TextOut((Width -  w) div 2, (Height -  h) div 2, s);
 end;
 
 procedure TTerminal.setBackgroundColor(value: TColor);
@@ -253,7 +290,7 @@ var
   c: TGDKColor;
 begin
   fBackgroundColor:=value;
-  {$ifdef lclgtk2}
+  {$ifdef hasgtk2term}
   if assigned(fTerminalHanlde) and assigned(vte_terminal_set_color_background) then
   begin
     c := TColortoTGDKColor(fBackgroundColor);
@@ -267,7 +304,7 @@ var
   c: TGDKColor;
 begin
   fForegroundColor:=value;
-  {$ifdef lclgtk2}
+  {$ifdef hasgtk2term}
   if assigned(fTerminalHanlde) and assigned(vte_terminal_set_color_foreground) then
   begin
     c := TColortoTGDKColor(fForegroundColor);
@@ -281,7 +318,7 @@ var
   c: TGDKColor;
 begin
   fSelectedColor:=value;
-  {$ifdef lclgtk2}
+  {$ifdef hasgtk2term}
   if assigned(fTerminalHanlde) and assigned(vte_terminal_set_color_highlight)
     and assigned(vte_terminal_set_color_highlight_foreground) then
   begin
@@ -296,7 +333,7 @@ end;
 procedure TTerminal.FontChanged(Sender: TObject);
 begin
   inherited;
-  {$ifdef lclgtk2}
+  {$ifdef hasgtk2term}
   {$push}{$Hints off}
   if assigned(fTerminalHanlde) and assigned(vte_terminal_set_font) and
     (Handle <> INVALID_HANDLE_VALUE) then
@@ -307,7 +344,7 @@ begin
   {$endif}
 end;
 
-{$ifdef lclgtk2}
+{$ifdef hasgtk2term}
 initialization
   RegisterTerminal;
 {$endif}
