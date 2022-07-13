@@ -27,6 +27,9 @@ type
   private
     FTerminal: ITerminal;
   protected
+    {$ifdef lclgtk2}
+    class procedure WSRegisterClass; override;
+    {$endif}
     procedure DoReady; virtual;
     procedure DoTerminate; virtual;
     property Terminal: ITerminal read FTerminal;
@@ -126,7 +129,7 @@ begin
   if FInfo = nil then
     Exit;
   ColorToGdk(Value, C);
-  case Element of
+  {%H-}case Element of
     teFore: vte_terminal_set_color_foreground(VTE_TERMINAL(FInfo.ClientWidget), @C);
     teBack: vte_terminal_set_color_background(VTE_TERMINAL(FInfo.ClientWidget), @C);
     teBold: vte_terminal_set_color_bold(VTE_TERMINAL(FInfo.ClientWidget), @C);
@@ -311,8 +314,14 @@ begin
 end;
 {$endregion}
 
-procedure TerminalRegister;
+var
+  Registered: Boolean;
+
+class procedure TTerminalControl.WSRegisterClass;
 begin
+  if Registered then
+    Exit;
+  Registered := True;
   if TerminalAvaiable then
     RegisterWSComponent(TTerminalControl, TGtk2WSTerminalControl);
 end;
@@ -385,10 +394,6 @@ function NewTerminal(Control: TTerminalControl): ITerminal;
 begin
   Result := TTerminal.Create(Control);
 end;
-
-procedure TerminalRegister;
-begin
-end;
 {$endif}
 
 constructor TTerminalControl.Create(AOwner: TComponent);
@@ -405,7 +410,5 @@ procedure TTerminalControl.DoTerminate;
 begin
 end;
 
-initialization
-  TerminalRegister;
 end.
 
