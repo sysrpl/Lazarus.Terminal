@@ -1,15 +1,28 @@
 unit TerminalCtrls;
 
-{$mode delphi}
+{$i terminal.inc}
 
 interface
 
 uses
-  Classes, SysUtils, Controls, Graphics, LCLIntf, VteIntf;
+  Classes, SysUtils, Controls, Graphics, LCLIntf;
+
+{ ITerminal }
+
+type
+  TTerminalElement = (teFore, teBack, teBold, teDim, teCursor, teHighlight);
+
+  ITerminal = interface
+  ['{9A2FEC91-5C43-494C-B6FC-C47742E85316}']
+    procedure SetInfo(Value: Pointer);
+    procedure SetColor(Element: TTerminalElement; Value: TColor);
+    procedure SetFont(Value: TFont);
+    procedure Paint;
+    procedure Restart;
+  end;
 
 { TTerminalColors }
 
-type
   TTerminalColors = class(TPersistent)
   private
     FTerminal: ITerminal;
@@ -28,6 +41,20 @@ type
     property Dim: TColor index 3 read GetColor write SetColor default clGray;
     property Cursor: TColor index 4 read GetColor write SetColor default clWhite;
     property Highlight: TColor index 5 read GetColor write SetColor default clWhite;
+  end;
+
+{ TTerminalControl }
+
+  TTerminalControl = class(TCustomControl)
+  protected
+    FTerminal: ITerminal;
+  protected
+    class procedure WSRegisterClass; override;
+    procedure DoReady; virtual;
+    procedure DoTerminate; virtual;
+    property Terminal: ITerminal read FTerminal;
+  public
+    constructor Create(AOwner: TComponent); override;
   end;
 
 { TCustomTerminal }
@@ -106,9 +133,21 @@ function TerminalAvaiable: Boolean;
 
 implementation
 
+uses
+  LCLType, WSLCLClasses,
+{$ifdef terminalgtk2}
+  Gtk2Vte;
+{$endif}
+{$ifdef terminalgtk3}
+  Gtk3Vte;
+{$endif}
+{$ifdef nosupport}
+  NoVte;
+{$endif}
+
 function TerminalAvaiable: Boolean;
 begin
-  Result := VteIntf.TerminalAvaiable;
+  Result := TerminalLoad;
 end;
 
 { TTerminalColors }
@@ -172,6 +211,34 @@ var
 begin
   E := TTerminalElement(Index);
   Result := FColors[E];
+end;
+
+{ TTerminalControl }
+
+var
+  Registered: Boolean;
+
+class procedure TTerminalControl.WSRegisterClass;
+begin
+  if Registered then
+    Exit;
+  Registered := True;
+  if TerminalAvaiable then
+    RegisterWSComponent(TTerminalControl, TWSTerminalControl);
+end;
+
+constructor TTerminalControl.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+  FTerminal := NewTerminal(Self);
+end;
+
+procedure TTerminalControl.DoReady;
+begin
+end;
+
+procedure TTerminalControl.DoTerminate;
+begin
 end;
 
 { TCustomTerminal }
