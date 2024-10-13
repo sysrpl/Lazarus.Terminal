@@ -126,7 +126,7 @@ begin
   Result := Loaded;
 end;
 
-function TerminalAvaiable: Boolean;
+function TerminalAvailable: Boolean;
 begin
   Result := TerminalLoad;
 end;

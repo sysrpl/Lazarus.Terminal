@@ -129,7 +129,7 @@ type
     property OnTerminate;
   end;
 
-function TerminalAvaiable: Boolean;
+function TerminalAvailable: Boolean;
 
 implementation
 
@@ -145,7 +145,7 @@ uses
   NoVte;
 {$endif}
 
-function TerminalAvaiable: Boolean;
+function TerminalAvailable: Boolean;
 begin
   Result := TerminalLoad;
 end;
